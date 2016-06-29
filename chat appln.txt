@@ -1,0 +1,212 @@
+
+Home Tutorials Java Sample-projects Online Chatting Application
+Online Chatting Application
+
+Posted in : Java Posted on : May 17, 2012 at 4:22 PM Comments : [ 0 ]
+	
+	
+inShare
+	
+Advertisements
+In this sample project you will learn about the Ajax for writing chatting application
+Online Chatting Application
+
+The presents application is developed using Spring MVC and Ajax. Here Spring plays the same role as it plays in other application for login of users and maintaining their session. Here Ajax plays the important roll and get/save chat in each second from/to the database. You can also increase the this time. It takes chat in the form of XML file as input. A loadChat.jsp plays the import role for generating this XML by running query from data base in each second. Here Ajax call this JSP to run this query in each second. The table structure is given below,
+user table
+
+CREATE TABLE user (                    
+          id int(11) NOT NULL auto_increment,  
+          name varchar(100) default NULL,      
+          email varchar(200) default NULL,     
+          login_id varchar(100) NOT NULL,      
+          password varchar(100) default NULL,  
+          type int(11) default NULL,           
+          PRIMARY KEY  (id,login_id)         
+        ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+
+
+message table
+
+CREATE TABLE message (                         
+           message_id int(11) NOT NULL auto_increment,  
+           chat_id int(11) NOT NULL default '0',        
+           user_id int(11) NOT NULL default '0',        
+           user_name varchar(64) default NULL,          
+           message text,                                
+           post_time datetime default NULL,             
+           PRIMARY KEY  (message_id)                    
+         ) ENGINE=InnoDB DEFAULT CHARSET=latin1    
+
+
+Here is the Ajax file that call the loadChat.jsp in every second
+
+ajax-chat.js
+
+                        var request = getXmlHttpRequestObject();
+                        var response = getXmlHttpRequestObject();
+                        var lastMessage = 0;
+                        var mTimer;
+                        
+
+                        function startChat() {
+                                document.getElementById('chatMessage').focus();
+                                getChatText();
+                        }               
+
+                        function getXmlHttpRequestObject() {                            
+                                if (window.XMLHttpRequest) {                                    
+                                        return new XMLHttpRequest();
+                                } else if(window.ActiveXObject) {                                       
+                                        return new ActiveXObject("Microsoft.XMLHTTP");
+                                }
+                        }
+                        
+                        function getChatText() {        
+                                if (response.readyState == 4 || response.readyState == 0) {
+                                        response.open("GET", 'loadChat.jsp?chat=1&last=' + lastMessage, true);
+                                        response.onreadystatechange = handleReceiveChat;
+                                        response.send(null);
+                                }                       
+                        }
+
+                        function sendChatText() {
+                                if(document.getElementById('chatMessage').value == '') {
+                                        alert("You have not entered a message");
+                                        return;
+                                }
+                                if (request.readyState == 4 || request.readyState == 0) {
+                                        request.open("POST", 'loadChat.jsp?chat=1&last=' + lastMessage, true);
+                                        request.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
+                                        request.onreadystatechange = handleSendChat; 
+                                        var param = 'message=' + document.getElementById('chatMessage').value;                                                                  
+                                        param += '&chat=1';
+                                        request.send(param);
+                                        document.getElementById('chatMessage').value = '';
+                                }                                                       
+                        }
+                        
+                        function handleSendChat() {                             
+                                clearInterval(mTimer);
+                                getChatText();
+                        }
+                        
+                        function handleReceiveChat() {                                                  
+                                if (response.readyState == 4) {                 
+                                        var chat_div = document.getElementById('chat');                                 
+                                        var xmldoc = response.responseXML;                                      
+                                        var message_nodes = xmldoc.getElementsByTagName("message");                                     
+                                        var n_messages = message_nodes.length;                          
+                                        for (i = 0; i < n_messages; i++) {                                              
+                                                var user_node = message_nodes[i].getElementsByTagName("user");
+                                                var text_node = message_nodes[i].getElementsByTagName("text");
+                                                var time_node = message_nodes[i].getElementsByTagName("time");
+                                                chat_div.innerHTML += ''+user_node[0].firstChild.nodeValue + ' ';
+                                                chat_div.innerHTML += '' + time_node[0].firstChild.nodeValue + '';                              
+                                                chat_div.innerHTML += text_node[0].firstChild.nodeValue.replace(":)", "").replace(":P", "").replace(":BS", "")+"";
+                                                chat_div.scrollTop = chat_div.scrollHeight;
+                                                lastMessage = (message_nodes[i].getAttribute('id'));                                    
+                                        }
+                                        mTimer = setTimeout('getChatText();',1000); 
+                                }
+                        }
+
+                        function blockSubmit() {
+                                sendChatText();
+                                return false;
+                        }
+
+                        function resetChat() {
+                                if (request.readyState == 4 || request.readyState == 0) {
+                                        request.open("POST", 'loadChat.jsp?chat=1&last=' + lastMessage, true);
+                                        request.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
+                                        request.onreadystatechange = handleResetChat; 
+                                        var param = 'action=reset';
+                                        request.send(param);
+                                        document.getElementById('chatMessage').value = '';
+                                }
+                        }
+
+                        function handleResetChat() {
+                                document.getElementById('chat').innerHTML = '';
+                                getChatText();
+                        }       
+
+
+The JSP file that Loads Chat is
+
+loadChat.jsp
+
+<%@page import="java.sql.ResultSet"%>
+<%@page import="java.sql.Statement"%>
+<%@page import="java.sql.Connection"%>
+<%@ page import="roseindia.chat.application.util.ConnectionUtil"%>
+<%
+response.setHeader("Cache-Control", "no-cache, must-revalidate");
+response.setHeader("Pragma", "no-cache");
+response.setHeader("Content-Type", "text/xml; charset=utf-8");
+%>
+<%!Connection connection = null;
+Statement statement = null;%>
+<%
+try {
+connection = ConnectionUtil.getConnection();
+statement = connection.createStatement();
+//Check to see if a message was sent.
+String message = request.getParameter("message");
+String chat = request.getParameter("chat"); 
+String name = (String)session.getAttribute("userName");
+String action = request.getParameter("action");
+String last = request.getParameter("last");
+String messageId = request.getParameter("message_id");
+StringBuffer xml = new StringBuffer();
+
+/* System.out.println("\nchat- " + chat + "\nname- " + name
++ "\nAction- " + action + "\nlast- " + last
++ "messageId=" + messageId + "Message- " + message);*/
+
+if (message != null) {
+String sql = "INSERT INTO message(chat_id, user_id, user_name, message, post_time) VALUES ('"
++ chat
++ "', 1, '"
++ name
++ "', '"
++ message
++ "', NOW())";
+statement.executeUpdate(sql);
+}
+//Check to see if a reset request was sent.
+if (action != null && action.equals("reset")) { 
+String sql = "DELETE FROM message WHERE chat_id =" + chat;
+statement.executeUpdate(sql);
+}
+xml.append("<root>");
+if (request.getParameter("chat") == null) {
+xml
+.append("Your are not currently in a chat session. <a href=''>Enter a chat session here</a>");
+xml.append("<message id='0'>");
+xml.append("<user>Admin</user>");
+xml
+.append("<text>Your are not currently in a chat session. &lt;a href=''&gt;Enter a chat session here&lt;/a&gt;</text>");
+xml.append("<time>' . date('h:i') . '</time>");
+xml.append("</message>");
+} else {
+String sql = "SELECT message_id, user_name, message, date_format(post_time, '%h:%i') as post_time FROM message WHERE chat_id = "
++ chat + " AND message_id > " + last;
+ResultSet resultSet = statement.executeQuery(sql);
+while (resultSet.next()) {
+xml.append("<message id='" + resultSet.getInt("message_id") + "'>"); 
+xml.append("<user>" + resultSet.getString("user_name") + "</user>");
+String text = resultSet.getString("message"); 
+xml.append("<text>" + text + "</text>");
+xml.append("<time>" + resultSet.getString("post_time") + "</time>"); 
+xml.append("</message>");
+}
+}
+xml.append("</root>");
+%>
+<%=xml%>
+<% 
+} catch (Exception e) {
+e.printStackTrace();
+}
+%>

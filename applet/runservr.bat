@@ -1,0 +1,1 @@
+java -classpath . sukhwinder.chat.Server
